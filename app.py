@@ -1,4 +1,4 @@
-# app.py (robust fetcher with debugging)
+# app.py  — robust SAPS fetcher with trimming & debug
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request
@@ -24,26 +24,32 @@ def truncate(text: str, max_chars: int) -> str:
 
 def extract_body(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
-    # try several likely containers/selectors
-    for sel in [
+    # Try several likely containers/selectors
+    selectors = [
         "div.newscontent p",
         "div#content p",
         "article p",
         "div.content p",
         "main p",
         "p",
-    ]:
+    ]
+    for sel in selectors:
         parts = [p.get_text(" ", strip=True) for p in soup.select(sel)]
         parts = [p for p in parts if p and len(p) > 25]
         if parts:
             return "\n".join(parts).strip()
-    # fallback: whole page text (last resort)
+    # Fallback: page text (last resort)
     return soup.get_text(" ", strip=True)
 
 @app.route("/latest", methods=["GET"])
 def latest():
-    """Return recent SAPS releases with trimmed bodies.
-       Query params: limit (default 3), max_chars (default 6000), debug (0/1)
+    """
+    Return recent SAPS releases with trimmed bodies.
+
+    Query params:
+      - limit: how many items to return (default 3)
+      - max_chars: trim each body to this many characters (default 6000)
+      - debug: 1 to include minimal debug fields
     """
     try:
         limit = int(request.args.get("limit", 3))
@@ -55,33 +61,5 @@ def latest():
         max_chars = 6000
     debug = request.args.get("debug", "0") == "1"
 
-    # fetch listing
-    lr = requests.get(LISTING_URL, headers=HEADERS, timeout=25)
-    status_listing = lr.status_code
-    lr.raise_for_status()
-    lsoup = BeautifulSoup(lr.text, "html.parser")
-
-    results = []
-    for a in lsoup.select("a[href*='msspeechdetail.php?nid=']")[:limit]:
-        href = a.get("href") or ""
-        if "nid=" not in href:
-            continue
-        nid = href.split("nid=")[-1].strip()
-        title = a.get_text(strip=True)
-
-        detail_url = DETAIL_BASE + nid
-        dr = requests.get(detail_url, headers=HEADERS, timeout=25, allow_redirects=True)
-        status_detail = dr.status_code
-        body = extract_body(dr.text).strip()
-        body = truncate(body, max_chars)
-
-        item = {
-            "nid": nid,
-            "title": title,
-            "body": body if body else "",
-        }
-
-        if debug:
-            # include minimal debug so we can see if we’re blocked
-            item["detail_url"] = detail_url
-            item["st]()
+    # Fetch listing
+    lr = requests.get(LISTING_URL, headers=HEADERS, time_
